@@ -1,10 +1,28 @@
-# ESPJack
+<h1 align="center">
+  <img src="docs/images/logo.svg" alt="ESPJack: an ESP32-S3 offensive security toolkit" width="720">
+</h1>
 
-**An ESP32-S3 Offensive Security Toolkit.**
+<p align="center">
+  Network reconnaissance, Active Directory enumeration, traffic interception and pivoting, from a USB serial CLI.
+</p>
+
+<p align="center">
+  <img alt="Platform: ESP32-S3" src="https://img.shields.io/badge/platform-ESP32--S3-1f6feb">
+  <img alt="Build: PlatformIO" src="https://img.shields.io/badge/build-PlatformIO-f5822a">
+  <a href="https://github.com/XPSec-Security/espjack/wiki"><img alt="Docs: wiki" src="https://img.shields.io/badge/docs-wiki-2ea043"></a>
+  <img alt="Use: authorized testing only" src="https://img.shields.io/badge/use-authorized%20testing%20only-b60205">
+</p>
 
 ESPJack is a lightweight, command-line security toolkit designed for ESP32-S3 devices. Built for security research, penetration testing and authorized network assessments, it brings network reconnaissance, traffic interception, Active Directory enumeration and post-exploitation capabilities into a compact embedded platform.
 
 No display. No web interface. Just a USB serial connection and a powerful CLI.
+
+<p align="center">
+  <a href="https://asciinema.org/a/k0zoHqj1mqaXl8ZM"><img src="docs/images/demo-recon.gif" alt="ESPJack demo: connect to Wi-Fi, then arpscan and portscan" width="860"></a><br>
+  <sub>Click the animation to open the interactive recording on asciinema.</sub>
+</p>
+
+**[Features](#features) · [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [Scope](#what-espjack-is-and-isnt) · [Hardware](#hardware-requirements) · [Install](#installation) · [Serial console](#serial-console) · [SD card](#sd-card-setup) · [Commands](#command-reference) · [Wiki](https://github.com/XPSec-Security/espjack/wiki)**
 
 ---
 
@@ -21,9 +39,38 @@ No display. No web interface. Just a USB serial connection and a powerful CLI.
 | **File System** | File management, SMB transfers and SD card access |
 | **Automation** | Scripts, payload execution and automatic startup |
 
-## How It Works
+## See it in action
+
+### ARP spoofing with a transparent relay
+
+`arpspoof on` finds every host on the local /24 and poisons them. The relay forwards the victims' traffic on, so they stay online while you watch the status.
+
+<p align="center">
+  <a href="https://asciinema.org/a/Z7C6JhGjBVaALP2I"><img src="docs/images/demo-arpspoof.gif" alt="ESPJack demo: arpspoof on, then arpspoof status while it discovers and poisons the hosts" width="860"></a><br>
+  <sub>Click the animation to open the interactive recording on asciinema.</sub>
+</p>
+
+The gateway entry in a victim's ARP table, before and after: the router's MAC is replaced by the device's.
+
+<p align="center">
+  <img src="docs/images/arpspoof.png" alt="The victim's ARP table before and after arpspoof" width="860">
+</p>
+
+### Authenticated SMB check
+
+`smbrecon` shows which account it authenticated as and whether that account is a local administrator.
+
+<p align="center">
+  <img src="docs/images/smb-auth.png" alt="smbrecon authenticating over SMB and reporting local admin status" width="720">
+</p>
+
+## How it works
 
 ESPJack runs directly on the ESP32-S3 and exposes a Linux-style command-line interface through its native USB serial connection.
+
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="Architecture: a computer talks to the ESP32-S3 over USB serial; the ESP32-S3 joins the target network over Wi-Fi, keeps scripts and loot on a microSD card, and can open a WireGuard tunnel to your infrastructure" width="860">
+</p>
 
 Getting started takes just a few steps:
 
@@ -40,6 +87,14 @@ help
 ```
 
 ESPJack also supports scripts stored on the microSD card, including automatic execution at startup through `/autorun.txt`.
+
+## What ESPJack is (and isn't)
+
+ESPJack is a drop-and-pivot implant for networks you are authorized to assess: reconnaissance, Active Directory enumeration, credential capture and pivoting. It is deliberately narrow.
+
+- **No Wi-Fi-layer attacks.** No deauthentication, evil twin or handshake capture. Use a dedicated tool such as [Bruce](https://github.com/pr3y/Bruce) for that.
+- **No remote command execution.** The SMB features are enumeration, authentication and file access, not a way to run commands on a target.
+- **No exfiltration channel.** ESPJack does not phone home: there is no cloud upload, webhook or wireless console. What it captures stays on the SD card until you collect it, for example by exporting the card with `mount`.
 
 ## Hardware Requirements
 
@@ -63,7 +118,7 @@ The default SPI configuration follows the M5Stack Cardputer ADV wiring:
 
 Custom GPIO assignments can be configured without rebuilding the firmware.
 
-See [SD Card Setup](https://github.com/XPSec-Security/espjack/wiki) for details.
+See [SD Card Setup](#sd-card-setup) for details.
 
 ## Installation
 
@@ -84,48 +139,24 @@ Build and upload:
 pio run -t upload
 ```
 
-Open the serial monitor:
-
-```bash
-pio device monitor
-```
-
 PlatformIO automatically installs the dependencies defined in `platformio.ini`.
+
+If the upload cannot find the board, put it in bootloader mode (hold the BOOT button while plugging in the USB cable) and upload again. The serial port number can differ between the bootloader and the running firmware.
 
 ## Serial Console
 
-ESPJack communicates through the ESP32-S3 native USB serial interface.
-
-**Connection settings:**
-
-| Parameter | Value |
-|---|---|
-| Baud rate | 115200 |
-| Data bits | 8 |
-| Parity | None |
-| Stop bits | 1 |
-
-Install pySerial:
+ESPJack communicates through the ESP32-S3 native USB serial interface at `115200` baud, 8 data bits, no parity, 1 stop bit.
 
 ```bash
 pip install pyserial
-```
 
-**Windows**
-
-```bash
+# Windows
 python -m serial.tools.miniterm COM8 115200
-```
 
-**Linux / macOS**
-
-```bash
+# Linux / macOS
 python -m serial.tools.miniterm /dev/ttyACM0 115200
-```
 
-To list available serial ports:
-
-```bash
+# List the available serial ports
 python -m serial.tools.list_ports
 ```
 
@@ -136,6 +167,8 @@ root@espjack#
 ```
 
 Use `Ctrl+C` to interrupt a running command and `Ctrl+]` to exit miniterm.
+
+To leave without turning the device off, type `exit`. The USB console detaches, so your terminal closes and you are back at your shell, while the device and any background tasks (such as `arpspoof` or `responder`) keep running. Run miniterm again to reconnect. miniterm prints a short pyserial traceback when the port disappears; that is expected.
 
 ## SD Card Setup
 
@@ -205,18 +238,18 @@ The autorun process starts approximately three seconds after boot. Press `Ctrl+C
 
 ## Command Reference
 
-ESPJack provides a collection of tools organized into functional categories.
+ESPJack provides a collection of tools organized into functional categories. Each command links to its page in the wiki.
 
 | Category | Commands |
 |---|---|
-| **Network** | `wifi`, `download` |
-| **Reconnaissance** | `portscan`, `hostscan`, `arpscan`, `nbtscan`, `nslookup`, `discover`, `snmp`, `dhcp` |
-| **Active Directory** | `smbrecon`, `smbshares`, `ldaprecon`, `kerbrute`, `asreproast`, `kerberoast` |
-| **MITM & Poisoning** | `arpspoof`, `responder`, `dnsspoof` |
-| **Capture** | `pcap` |
-| **Pivoting** | `wireguard`, `socks5` |
-| **File Management** | `ls`, `cat`, `echo`, `rm`, `mkdir`, `rmdir`, `mv`, `cp`, `get`, `put`, `stat`, `df` |
-| **System** | `help`, `settings`, `run`, `delay`, `loot`, `date`, `mount`, `unmount`, `clear`, `reboot` |
+| **Network** | [`wifi`](https://github.com/XPSec-Security/espjack/wiki/wifi), [`download`](https://github.com/XPSec-Security/espjack/wiki/download) |
+| **Reconnaissance** | [`portscan`](https://github.com/XPSec-Security/espjack/wiki/portscan), [`hostscan`](https://github.com/XPSec-Security/espjack/wiki/hostscan), [`arpscan`](https://github.com/XPSec-Security/espjack/wiki/arpscan), [`nbtscan`](https://github.com/XPSec-Security/espjack/wiki/nbtscan), [`nslookup`](https://github.com/XPSec-Security/espjack/wiki/nslookup), [`discover`](https://github.com/XPSec-Security/espjack/wiki/discover), [`snmp`](https://github.com/XPSec-Security/espjack/wiki/snmp), [`dhcp`](https://github.com/XPSec-Security/espjack/wiki/dhcp) |
+| **Active Directory** | [`smbrecon`](https://github.com/XPSec-Security/espjack/wiki/smbrecon), [`smbshares`](https://github.com/XPSec-Security/espjack/wiki/smbshares), [`ldaprecon`](https://github.com/XPSec-Security/espjack/wiki/ldaprecon), [`kerbrute`](https://github.com/XPSec-Security/espjack/wiki/kerbrute), [`asreproast`](https://github.com/XPSec-Security/espjack/wiki/asreproast), [`kerberoast`](https://github.com/XPSec-Security/espjack/wiki/kerberoast) |
+| **MITM & Poisoning** | [`arpspoof`](https://github.com/XPSec-Security/espjack/wiki/arpspoof), [`responder`](https://github.com/XPSec-Security/espjack/wiki/responder), [`dnsspoof`](https://github.com/XPSec-Security/espjack/wiki/dnsspoof) |
+| **Capture** | [`pcap`](https://github.com/XPSec-Security/espjack/wiki/pcap) |
+| **Pivoting** | [`wireguard`](https://github.com/XPSec-Security/espjack/wiki/wireguard), [`socks5`](https://github.com/XPSec-Security/espjack/wiki/socks5) |
+| **File Management** | [`ls`](https://github.com/XPSec-Security/espjack/wiki/ls), [`cat`](https://github.com/XPSec-Security/espjack/wiki/cat), [`echo`](https://github.com/XPSec-Security/espjack/wiki/echo), [`rm`](https://github.com/XPSec-Security/espjack/wiki/rm), [`mkdir`](https://github.com/XPSec-Security/espjack/wiki/mkdir), [`rmdir`](https://github.com/XPSec-Security/espjack/wiki/rmdir), [`mv`](https://github.com/XPSec-Security/espjack/wiki/mv), [`cp`](https://github.com/XPSec-Security/espjack/wiki/cp), [`get`](https://github.com/XPSec-Security/espjack/wiki/get), [`put`](https://github.com/XPSec-Security/espjack/wiki/put), [`stat`](https://github.com/XPSec-Security/espjack/wiki/stat), [`df`](https://github.com/XPSec-Security/espjack/wiki/df) |
+| **System** | [`help`](https://github.com/XPSec-Security/espjack/wiki/help), [`settings`](https://github.com/XPSec-Security/espjack/wiki/settings), [`run`](https://github.com/XPSec-Security/espjack/wiki/run), [`delay`](https://github.com/XPSec-Security/espjack/wiki/delay), [`loot`](https://github.com/XPSec-Security/espjack/wiki/loot), [`date`](https://github.com/XPSec-Security/espjack/wiki/date), [`mount`](https://github.com/XPSec-Security/espjack/wiki/mount), [`unmount`](https://github.com/XPSec-Security/espjack/wiki/unmount), [`clear`](https://github.com/XPSec-Security/espjack/wiki/clear), [`exit`](https://github.com/XPSec-Security/espjack/wiki/exit), [`reboot`](https://github.com/XPSec-Security/espjack/wiki/reboot) |
 
 For a complete command reference, run:
 
@@ -224,7 +257,7 @@ For a complete command reference, run:
 help
 ```
 
-To display detailed documentation and available options for a specific command:
+To display the usage and available options for a specific command:
 
 ```bash
 <command> -h
@@ -242,7 +275,7 @@ Visit the [ESPJack Wiki](https://github.com/XPSec-Security/espjack/wiki) for det
 
 ESPJack is designed around the capabilities and constraints of the ESP32-S3 platform.
 
-- **Scanning:** Uses TCP connect and application-layer techniques rather than raw SYN scanning.
+- **Scanning:** TCP connect with banner and version detection by default. `portscan -s` runs a half-open SYN scan over a raw socket: it reports open, closed and filtered ports, but no banner or version.
 - **Protocol implementations:** SMB2, LDAP, Kerberos and SOCKS5 are lightweight, custom implementations focused on the functionality required by the toolkit.
 - **ARP spoofing:** Uses a custom Layer 2 relay to keep intercepted devices connected during authorized testing.
 - **SOCKS5:** Supports CONNECT only. BIND and UDP ASSOCIATE are not implemented.

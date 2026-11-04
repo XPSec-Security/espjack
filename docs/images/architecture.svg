@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" width="960" height="380" role="img" aria-labelledby="t d">
+  <title id="t">ESPJack architecture</title>
+  <desc id="d">A computer talks to the ESP32-S3 over USB serial. The ESP32-S3 joins the target network over Wi-Fi, stores scripts and loot on a microSD card, and can open a WireGuard tunnel back to the operator.</desc>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <style>
+      .bg   { fill: #0d1117; }
+      .box  { fill: #161b22; stroke: #30363d; stroke-width: 1.5; }
+      .core { fill: #161b22; stroke: #2f81f7; stroke-width: 2; }
+      .chip { fill: #0d1117; stroke: #30363d; stroke-width: 1; }
+      .h    { fill: #e6edf3; font: 600 15px "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .big  { fill: #e6edf3; font: 700 22px "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .n    { fill: #e6edf3; font: 600 12.5px "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .m    { fill: #8b949e; font: 11px "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .ml   { fill: #8b949e; font: 12px "Segoe UI", Helvetica, Arial, sans-serif; }
+      .lbl  { fill: #58a6ff; font: 600 11px "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .mono { fill: #8b949e; font: 11px Consolas, "Courier New", monospace; }
+      .monoc{ fill: #7ee787; font: 11.5px Consolas, "Courier New", monospace; }
+      .link { stroke: #58a6ff; stroke-width: 2; fill: none; }
+      .dash { stroke: #58a6ff; stroke-width: 2; fill: none; stroke-dasharray: 6 5; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="960" height="380" rx="14"/>
+
+  <!-- your computer -->
+  <rect class="box" x="28" y="96" width="180" height="150" rx="10"/>
+  <text class="h" x="118" y="124">Your computer</text>
+  <rect class="chip" x="46" y="140" width="144" height="70" rx="6"/>
+  <text class="mono" x="56" y="162">&gt; miniterm COM8</text>
+  <text class="monoc" x="56" y="184">root@espjack# _</text>
+  <text class="m" x="118" y="232">serial terminal</text>
+
+  <!-- USB link -->
+  <path class="link" d="M208,171 H300" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text class="lbl" x="254" y="160">USB</text>
+  <text class="m" x="254" y="190">115200 8N1</text>
+
+  <!-- ESPJack core -->
+  <rect class="core" x="300" y="36" width="340" height="212" rx="12"/>
+  <text class="big" x="470" y="68">ESPJack</text>
+  <text class="m" x="470" y="87">ESP32-S3 · serial CLI</text>
+
+  <rect class="chip" x="306" y="104" width="104" height="38" rx="6"/>
+  <text class="n" x="358" y="121">Recon</text>
+  <text class="m" x="358" y="135">scan·DNS·SNMP</text>
+
+  <rect class="chip" x="418" y="104" width="104" height="38" rx="6"/>
+  <text class="n" x="470" y="121">Active Directory</text>
+  <text class="m" x="470" y="135">SMB·LDAP·Kerberos</text>
+
+  <rect class="chip" x="530" y="104" width="104" height="38" rx="6"/>
+  <text class="n" x="582" y="121">MITM</text>
+  <text class="m" x="582" y="135">ARP·DNS·Responder</text>
+
+  <rect class="chip" x="306" y="150" width="104" height="38" rx="6"/>
+  <text class="n" x="358" y="167">Capture</text>
+  <text class="m" x="358" y="181">pcap → SD</text>
+
+  <rect class="chip" x="418" y="150" width="104" height="38" rx="6"/>
+  <text class="n" x="470" y="167">Pivot</text>
+  <text class="m" x="470" y="181">WireGuard·SOCKS5</text>
+
+  <rect class="chip" x="530" y="150" width="104" height="38" rx="6"/>
+  <text class="n" x="582" y="167">Files</text>
+  <text class="m" x="582" y="181">SD·SMB get/put</text>
+
+  <text class="m" x="470" y="220">scripts · autorun · loot</text>
+
+  <!-- microSD -->
+  <path class="link" d="M470,248 V286" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text class="lbl" x="490" y="271" style="text-anchor:start">SPI</text>
+  <rect class="box" x="300" y="286" width="340" height="70" rx="10"/>
+  <text class="h" x="470" y="311">microSD</text>
+  <text class="mono" x="470" y="336" style="text-anchor:middle">/autorun.txt · /scripts · /wordlists · /loot</text>
+
+  <!-- target network -->
+  <path class="link" d="M640,96 H740" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text class="lbl" x="690" y="86">Wi-Fi</text>
+  <rect class="box" x="740" y="36" width="192" height="120" rx="10"/>
+  <text class="h" x="836" y="64">Target network</text>
+  <text class="m" x="836" y="82">ESPJack joins as a Wi-Fi client</text>
+  <text class="n" x="836" y="108" style="font-weight:400">domain controllers</text>
+  <text class="n" x="836" y="126" style="font-weight:400">servers · hosts</text>
+  <text class="n" x="836" y="144" style="font-weight:400">router / gateway</text>
+
+  <!-- operator infrastructure -->
+  <path class="dash" d="M640,205 L740,250" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text class="lbl" x="676" y="196" style="text-anchor:middle">WireGuard</text>
+  <text class="m" x="706" y="258">(optional)</text>
+  <rect class="box" x="740" y="214" width="192" height="130" rx="10"/>
+  <text class="h" x="836" y="244">Your infrastructure</text>
+  <text class="n" x="836" y="272" style="font-weight:400">WireGuard peer</text>
+  <text class="m" x="836" y="296">reach the target LAN</text>
+  <text class="m" x="836" y="311">through the SOCKS5 pivot</text>
+
+  <!-- caption -->
+  <text class="ml" x="28" y="290">No display. No web interface.</text>
+  <text class="ml" x="28" y="310">Just USB serial and a CLI.</text>
+</svg>
