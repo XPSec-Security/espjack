@@ -1,236 +1,282 @@
 # ESPJack
 
-<p align="center">
-  <img src="docs/images/logo.png" alt="ESPJack banner and prompt in a serial terminal" width="620">
-</p>
+**An ESP32-S3 Offensive Security Toolkit.**
 
-An offensive-security / pentest toolkit firmware for **any ESP32-S3 board**
-with a microSD card over SPI. No display, no web panel: everything happens
-over a Linux-style serial CLI on the S3's native USB.
+ESPJack is a lightweight, command-line security toolkit designed for ESP32-S3 devices. Built for security research, penetration testing and authorized network assessments, it brings network reconnaissance, traffic interception, Active Directory enumeration and post-exploitation capabilities into a compact embedded platform.
 
-**Documentation:** the [wiki](https://github.com/XPSec-Security/espjack/wiki)
-has the full guide and one page per command.
+No display. No web interface. Just a USB serial connection and a powerful CLI.
 
-> **WARNING: authorized use only.** This firmware bundles active offensive
-> tooling: ARP spoofing with transparent relay, DNS spoofing, LLMNR/NBT-NS
-> poisoning with credential capture, port/host/service scanning, zero- and
-> authenticated-credential Active Directory enumeration, a WireGuard pivot
-> with a SOCKS5 proxy, and a payload/autorun runner. Use it only on networks
-> and systems you own or are explicitly authorized to test. You are
-> responsible for complying with applicable laws and the scope of any
-> engagement.
+---
 
-## How it works
+## Features
 
-1. Flash the firmware and open the USB serial console (115200 8N1, see
-   [Connecting to the serial console](#connecting-to-the-serial-console)).
-   You get a banner and a `root@espjack#` prompt: a small Linux-style shell
-   with line editing, command history (arrow keys), and `Ctrl+C` to cancel
-   a running command.
-2. `wifi connect <ssid> [password]` to join a network. Most commands need
-   this first (they'll tell you if they don't).
-3. Run commands directly, or drop a script on the SD card and `run` it, or
-   name it `/autorun.txt` to have it execute automatically on every boot
-   (with a 3-second `Ctrl+C` cancel window), for a device meant to be
-   plugged in and left behind.
-4. `help` lists every command by category; `<command> -h` (or
-   `help <command>`) prints a full manual with options and example output.
+| Category | Capabilities |
+|---|---|
+| **Network** | Wi-Fi scanning, connection and network discovery |
+| **Reconnaissance** | Host discovery, port scanning, DNS, SNMP and DHCP |
+| **Active Directory** | SMB, LDAP, Kerberos, AS-REP Roasting and Kerberoasting |
+| **MITM** | ARP spoofing, DNS spoofing and Responder |
+| **Capture** | Network packet capture and PCAP export |
+| **Pivoting** | WireGuard tunnel and SOCKS5 proxy |
+| **File System** | File management, SMB transfers and SD card access |
+| **Automation** | Scripts, payload execution and automatic startup |
 
-## Examples
+## How It Works
 
-Real sessions captured from a device.
+ESPJack runs directly on the ESP32-S3 and exposes a Linux-style command-line interface through its native USB serial connection.
 
-### Join a network
+Getting started takes just a few steps:
 
-`wifi scan` lists the access points around, `wifi connect` joins one (the
-password is masked on screen as you type it), and `wifi status` shows what
-the network sees, including the hostname and MAC the device presents.
+1. Flash the firmware onto your ESP32-S3.
+2. Connect the device to your computer via USB.
+3. Open a serial terminal at `115200` baud.
+4. Connect to a Wi-Fi network.
+5. Start running commands.
 
-![wifi scan, wifi connect and wifi status](docs/images/wifi-connect.png)
+```bash
+wifi scan
+wifi connect <ssid> <password>
+help
+```
 
-### Map the network
+ESPJack also supports scripts stored on the microSD card, including automatic execution at startup through `/autorun.txt`.
 
-`arpscan` finds every live host on the subnet (it works even when ICMP is
-blocked), `portscan` fingerprints the open ports of one of them, and
-`smbrecon` reads what its SMB server reveals before any login: dialect,
-signing, null-session and the NetBIOS/DNS names.
+## Hardware Requirements
 
-![arpscan, portscan and smbrecon](docs/images/network-scan.png)
+- ESP32-S3 development board.
+- Native USB connection.
+- microSD card (optional, required for storage-dependent features).
 
-### Check credentials and admin rights
+The firmware targets the generic `esp32-s3-devkitc-1` PlatformIO board definition and supports different ESP32-S3 development boards.
 
-With `-u`/`-p` (or `-H` for pass-the-hash) `smbrecon` validates a login,
-shows which domain it authenticated against and whether the account is an
-administrator on that host. Add `--local-auth` to target the machine's local
-accounts instead of a domain.
+### microSD Configuration
 
-![smbrecon with credentials](docs/images/smb-auth.png)
+The default SPI configuration follows the M5Stack Cardputer ADV wiring:
 
-### Poison the ARP caches
+| Signal | GPIO |
+|---|---:|
+| CS | 12 |
+| SCK | 40 |
+| MISO | 39 |
+| MOSI | 14 |
+| Card enable | 5 |
 
-`arpspoof on` poisons the whole subnet while the transparent relay keeps
-the victims online. On the victim (right), the gateway's MAC in its ARP
-table changes to the device's MAC after the attack starts.
+Custom GPIO assignments can be configured without rebuilding the firmware.
 
-![arpspoof status and the victim's ARP table before and after](docs/images/arpspoof.png)
+See [SD Card Setup](https://github.com/XPSec-Security/espjack/wiki) for details.
 
-## Hardware
+## Installation
 
-Targets the generic `esp32-s3-devkitc-1` board definition, which works for
-essentially any ESP32-S3 module/devkit; it only affects flash
-size/partitioning defaults, not pin assignments. A microSD card over SPI is
-optional overall, but required for several features (see below).
+### Build and Flash
 
-The SD SPI pins default to the **M5Stack Cardputer ADV** wiring
-(`CS=12 SCK=40 MISO=39 MOSI=14`, plus driving GPIO5 high, which that board
-family needs for the card to enumerate) but are **not compiled in**; see
-[SD card setup](#sd-card-setup) to point them at your own board without
-rebuilding.
+ESPJack uses [PlatformIO](https://platformio.org/) for firmware development and deployment.
 
-The USB is configured as a composite CDC (this console) + MSC device, so the
-`mount` command can expose the SD card to a host PC as a normal USB drive
-without disturbing the console.
+Clone the repository:
 
-## Building
+```bash
+git clone https://github.com/XPSec-Security/espjack.git
+cd espjack
+```
 
-Requires [PlatformIO](https://platformio.org/).
+Build and upload:
 
 ```bash
 pio run -t upload
+```
+
+Open the serial monitor:
+
+```bash
 pio device monitor
 ```
 
-See `platformio.ini` for library dependencies; PlatformIO installs them
-automatically on first build.
+PlatformIO automatically installs the dependencies defined in `platformio.ini`.
 
-## Connecting to the serial console
+## Serial Console
 
-The console is the ESP32-S3's native USB serial port (115200 8N1). Any
-terminal works; the simplest is `miniterm`, which ships with
-[pySerial](https://pypi.org/project/pyserial/) (`pip install pyserial`):
+ESPJack communicates through the ESP32-S3 native USB serial interface.
+
+**Connection settings:**
+
+| Parameter | Value |
+|---|---|
+| Baud rate | 115200 |
+| Data bits | 8 |
+| Parity | None |
+| Stop bits | 1 |
+
+Install pySerial:
 
 ```bash
-# Windows
-python -m serial.tools.miniterm COM8 115200
+pip install pyserial
+```
 
-# Linux / macOS
+**Windows**
+
+```bash
+python -m serial.tools.miniterm COM8 115200
+```
+
+**Linux / macOS**
+
+```bash
 python -m serial.tools.miniterm /dev/ttyACM0 115200
 ```
 
-- The port name is not fixed. List the candidates with
-  `python -m serial.tools.list_ports` (the device shows up as an Espressif
-  USB serial port), or check Device Manager on Windows. The number can change
-  after a reflash or reboot, since the board re-enumerates on USB.
-- `Ctrl+C` is sent to the device, so it cancels the running command as
-  usual. To leave `miniterm` itself, press `Ctrl+]`.
-- Only one program can hold the port at a time: close the terminal before
-  flashing, or the upload fails with "port busy".
+To list available serial ports:
 
-## SD card setup
-
-Everything below lives on the microSD card; none of it requires a rebuild.
-
-### Pin configuration
-
-SD pins (and a couple of network-identity settings) are **not** stored on
-the SD card itself: that would be circular, since the pins have to be known
-before the card can be read. They live in `/settings.json` on the device's
-**internal flash**, managed with the `settings` command:
-
+```bash
+python -m serial.tools.list_ports
 ```
-settings show                              # print the current settings
-settings set sd.cs 10                      # change one SD pin (needs 'reboot')
+
+Once connected, you should see the ESPJack shell:
+
+```text
+root@espjack#
+```
+
+Use `Ctrl+C` to interrupt a running command and `Ctrl+]` to exit miniterm.
+
+## SD Card Setup
+
+The microSD card provides persistent storage for scripts, wordlists, packet captures and collected data.
+
+### Directory Structure
+
+```text
+/
+├── autorun.txt
+├── scripts/
+├── wordlists/
+│   ├── users.txt
+│   └── spns.txt
+└── loot/
+    ├── responder_ntlm.txt
+    └── captures.pcap
+```
+
+Sample wordlists are available in:
+
+```text
+sd_card/wordlists/
+```
+
+Copy the desired `.example` files to `/wordlists/` and remove the `.example` extension.
+
+The `/loot` directory is created automatically when a microSD card is detected.
+
+### Device Settings
+
+ESPJack stores device settings in its internal flash at `/settings.json`.
+
+Examples:
+
+```bash
+settings show
+
+settings set sd.cs 10
 settings set sd.sck 12
 settings set sd.miso 13
 settings set sd.mosi 11
-settings set hostname MyPhone              # DHCP hostname (blends in on 'wifi connect')
-settings set mac AA:BB:CC:DD:EE:FF         # spoof the STA MAC (blends in on 'wifi connect')
-settings reset                             # back to the Cardputer ADV defaults
+
+settings set hostname MyDevice
+settings set mac AA:BB:CC:DD:EE:FF
+
+settings reset
 ```
 
-On a different ESP32-S3 board, just set the four `sd.*` pins to match your
-wiring and `reboot`; no firmware changes needed.
+Changes to SD card GPIO assignments require a reboot.
 
-### Directory layout
+### Autorun
 
-```
-/settings.json      SD pins + network identity (internal flash, not the card)
-/autorun.txt         optional - commands to run automatically at boot
-/scripts/...         optional - payloads for the 'run <file>' command
-/wordlists/
-  users.txt          one username per line (kerbrute, asreproast default)
-  spns.txt           one service/host[:port] per line (kerberoast default)
-/loot/               everything the tools capture lands here automatically:
-  responder_ntlm.txt   NTLMv2/v1/Basic captures from Responder, one hashcat-
-                       ready line per capture
-  <name>.pcap          packet captures (the 'pcap' command)
-```
+ESPJack supports automatic command execution during startup.
 
-Sample wordlists are at `sd_card/wordlists/*.example` in this repo; copy
-them to `/wordlists/` on the card (dropping the `.example` suffix) and edit
-as needed. `/loot` is created automatically on first boot with a card
-present; use `loot list`/`loot clear` to manage it, `mount` to pull files off
-over USB, or `get`/`put` over an SMB share.
+Create `/autorun.txt` on the microSD card:
 
-### Autorun example
-
-```
-# /autorun.txt - runs automatically ~3s after boot (Ctrl+C to skip)
-wifi connect CorpWifi s3cretpass
+```bash
+wifi connect <ssid> <password>
 delay 3000
 arpspoof on
 responder on
 pcap start sweep
 ```
 
-## Commands
+The autorun process starts approximately three seconds after boot. Press `Ctrl+C` during this window to cancel execution.
 
-Run `help` on the device for the live, grouped list, or `<command> -h` for
-full details and example output. The same manuals are published as one page
-per command in the [wiki](https://github.com/XPSec-Security/espjack/wiki).
-Summary:
+## Command Reference
 
-**network**: `wifi`, `download`
+ESPJack provides a collection of tools organized into functional categories.
 
-**recon**: `portscan`, `hostscan`, `arpscan`, `nbtscan`, `nslookup`,
-`discover`, `snmp`, `dhcp`
+| Category | Commands |
+|---|---|
+| **Network** | `wifi`, `download` |
+| **Reconnaissance** | `portscan`, `hostscan`, `arpscan`, `nbtscan`, `nslookup`, `discover`, `snmp`, `dhcp` |
+| **Active Directory** | `smbrecon`, `smbshares`, `ldaprecon`, `kerbrute`, `asreproast`, `kerberoast` |
+| **MITM & Poisoning** | `arpspoof`, `responder`, `dnsspoof` |
+| **Capture** | `pcap` |
+| **Pivoting** | `wireguard`, `socks5` |
+| **File Management** | `ls`, `cat`, `echo`, `rm`, `mkdir`, `rmdir`, `mv`, `cp`, `get`, `put`, `stat`, `df` |
+| **System** | `help`, `settings`, `run`, `delay`, `loot`, `date`, `mount`, `unmount`, `clear`, `reboot` |
 
-**active directory**: `smbrecon`, `smbshares`, `ldaprecon`, `kerbrute`,
-`asreproast`, `kerberoast`
+For a complete command reference, run:
 
-**mitm & poisoning**: `arpspoof`, `responder`, `dnsspoof`
+```bash
+help
+```
 
-**capture**: `pcap`
+To display detailed documentation and available options for a specific command:
 
-**pivot**: `wireguard`, `socks5`
+```bash
+<command> -h
+```
 
-**files**: `ls`, `cat`, `echo`, `rm`, `mkdir`, `rmdir`, `mv`, `cp`, `get`,
-`put`, `stat`, `df` (`ls`/`cat`/`rm`/`mkdir`/`rmdir`/`get`/`put` also reach a
-remote SMB share via a `//host/share/path` target, with `-u`/`-p`/`-H`/`-d`
-credential flags)
+Or:
 
-**system**: `help`, `settings`, `run`, `delay`, `loot`, `date`, `mount`,
-`unmount`, `clear`, `reboot`
+```bash
+help <command>
+```
 
-## Honesty notes / known limitations
+Visit the [ESPJack Wiki](https://github.com/XPSec-Security/espjack/wiki) for detailed documentation and usage examples.
 
-- All scanning is **TCP connect / application-layer**; there is no raw SYN
-  scanning or packet-level spoofing beyond what's explicitly described above
-  (ARP frames, DNS forgery, LLMNR/NBT-NS frames, Ethernet/802.11 capture).
-- Protocol implementations for SMB2 (incl. SRVSVC share enumeration), LDAP
-  (BER/ASN.1), Kerberos (DER/ASN.1) and SOCKS5 are hand-written against the
-  public specs to the minimum needed here, not full client stacks. They
-  target mainstream, modern servers; unusual configurations may need
-  adjustment.
-- `arpspoof`'s relay (so poisoned victims keep working instead of being
-  black-holed) and `dnsspoof` both re-inject frames through a shared WiFi RX
-  hook (`modules/mitm/nettap`); lwIP's own IP forwarding can't do this (it
-  won't forward a packet back out the interface it arrived on), so this is a
-  hand-rolled L2 relay; throughput is bounded by a single ESP32-S3 radio.
-- `socks5` only supports the CONNECT command (no BIND/UDP-ASSOCIATE) and a
-  small number of concurrent connections (lwIP's socket budget is limited).
-  It's meant to be reached through the `wireguard` pivot tunnel.
-- Kerberoasting needs real domain credentials and performs RC4-HMAC Kerberos
-  crypto by hand (RFC 4757: MD4 + HMAC-MD5 + RC4; no such library exists for
-  Arduino); treat it as experimental. AS-REP Roasting needs no decryption at
-  all, so it carries much less risk of being subtly wrong.
+## Technical Notes & Limitations
+
+ESPJack is designed around the capabilities and constraints of the ESP32-S3 platform.
+
+- **Scanning:** Uses TCP connect and application-layer techniques rather than raw SYN scanning.
+- **Protocol implementations:** SMB2, LDAP, Kerberos and SOCKS5 are lightweight, custom implementations focused on the functionality required by the toolkit.
+- **ARP spoofing:** Uses a custom Layer 2 relay to keep intercepted devices connected during authorized testing.
+- **SOCKS5:** Supports CONNECT only. BIND and UDP ASSOCIATE are not implemented.
+- **Concurrent connections:** Limited by the ESP32-S3 networking stack and available socket resources.
+- **Kerberoasting:** Experimental implementation using RC4-HMAC Kerberos cryptography.
+- **AS-REP Roasting:** Does not require password decryption to retrieve the relevant authentication material.
+
+Performance and compatibility may vary depending on the target network, hardware and server configuration.
+
+## Security & Responsible Use
+
+ESPJack includes active security testing and network interception capabilities.
+
+It is intended exclusively for:
+
+- Authorized penetration testing.
+- Security research and education.
+- Controlled laboratory environments.
+- Networks and systems you own or have explicit permission to assess.
+
+**Never use ESPJack against systems or networks without proper authorization.**
+
+The user is responsible for complying with applicable laws, regulations and engagement scopes.
+
+## Documentation
+
+For detailed guides, command references and configuration instructions:
+
+**[ESPJack Wiki](https://github.com/XPSec-Security/espjack/wiki)**
+
+## License
+
+See the repository for licensing information.
+
+---
+
+**ESPJack** · Developed by [XPSec Security](https://github.com/XPSec-Security)
