@@ -8,6 +8,9 @@ An offensive-security / pentest toolkit firmware for **any ESP32-S3 board**
 with a microSD card over SPI. No display, no web panel: everything happens
 over a Linux-style serial CLI on the S3's native USB.
 
+**Documentation:** the [wiki](https://github.com/XPSec-Security/espjack/wiki)
+has the full guide and one page per command.
+
 > **WARNING: authorized use only.** This firmware bundles active offensive
 > tooling: ARP spoofing with transparent relay, DNS spoofing, LLMNR/NBT-NS
 > poisoning with credential capture, port/host/service scanning, zero- and
@@ -183,7 +186,9 @@ pcap start sweep
 ## Commands
 
 Run `help` on the device for the live, grouped list, or `<command> -h` for
-full details and example output. Summary:
+full details and example output. The same manuals are published as one page
+per command in the [wiki](https://github.com/XPSec-Security/espjack/wiki).
+Summary:
 
 **network**: `wifi`, `download`
 
