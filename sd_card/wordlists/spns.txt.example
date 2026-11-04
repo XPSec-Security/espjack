@@ -1,0 +1,5 @@
+MSSQLSvc/sql01.corp.local:1433
+HTTP/web01.corp.local
+cifs/fileserver.corp.local
+HOST/dc01.corp.local
+ldap/dc01.corp.local

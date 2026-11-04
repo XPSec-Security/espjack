@@ -1,0 +1,8 @@
+# Run with: run /scripts/ad-check.txt
+# Zero-credential Active Directory recon against a domain controller.
+# Replace 192.168.1.10 with the DC's IP before running.
+
+smbrecon 192.168.1.10
+ldaprecon 192.168.1.10
+kerbrute 192.168.1.10 CORP.LOCAL
+asreproast 192.168.1.10 CORP.LOCAL

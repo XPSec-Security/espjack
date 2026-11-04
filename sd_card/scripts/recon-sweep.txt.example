@@ -1,0 +1,8 @@
+# Run with: run /scripts/recon-sweep.txt
+# A read-only recon pass: no poisoning, no credential capture. Safe to run
+# first on any network to see what is there before deciding next steps.
+
+arpscan
+nbtscan
+discover
+dhcp
