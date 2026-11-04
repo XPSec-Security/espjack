@@ -17,13 +17,6 @@ ESPJack is a lightweight, command-line security toolkit designed for ESP32-S3 de
 
 No display. No web interface. Just a USB serial connection and a powerful CLI.
 
-<p align="center">
-  <a href="https://asciinema.org/a/k0zoHqj1mqaXl8ZM"><img src="docs/images/demo-recon.gif" alt="ESPJack demo: connect to Wi-Fi, then arpscan and portscan" width="860"></a><br>
-  <sub>Click the animation to open the interactive recording on asciinema.</sub>
-</p>
-
-**[Features](#features) · [See it in action](#see-it-in-action) · [How it works](#how-it-works) · [Scope](#what-espjack-is-and-isnt) · [Hardware](#hardware-requirements) · [Install](#installation) · [Serial console](#serial-console) · [SD card](#sd-card-setup) · [Commands](#command-reference) · [Wiki](https://github.com/XPSec-Security/espjack/wiki)**
-
 ---
 
 ## Features
@@ -40,6 +33,15 @@ No display. No web interface. Just a USB serial connection and a powerful CLI.
 | **Automation** | Scripts, payload execution and automatic startup |
 
 ## See it in action
+
+### Host discovery via arp and portscan
+
+You can connect to a wi-fi network and control the device over SERIAL.
+
+<p align="center">
+  <a href="https://asciinema.org/a/k0zoHqj1mqaXl8ZM"><img src="docs/images/demo-recon.gif" alt="ESPJack demo: connect to Wi-Fi, then arpscan and portscan" width="860"></a><br>
+  <sub>Click the animation to open the interactive recording on asciinema.</sub>
+</p>
 
 ### ARP spoofing with a transparent relay
 
@@ -285,30 +287,11 @@ ESPJack is designed around the capabilities and constraints of the ESP32-S3 plat
 
 Performance and compatibility may vary depending on the target network, hardware and server configuration.
 
-## Security & Responsible Use
-
-ESPJack includes active security testing and network interception capabilities.
-
-It is intended exclusively for:
-
-- Authorized penetration testing.
-- Security research and education.
-- Controlled laboratory environments.
-- Networks and systems you own or have explicit permission to assess.
-
-**Never use ESPJack against systems or networks without proper authorization.**
-
-The user is responsible for complying with applicable laws, regulations and engagement scopes.
-
 ## Documentation
 
 For detailed guides, command references and configuration instructions:
 
 **[ESPJack Wiki](https://github.com/XPSec-Security/espjack/wiki)**
-
-## License
-
-See the repository for licensing information.
 
 ---
 
