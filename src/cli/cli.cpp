@@ -38,6 +38,7 @@ extern "C" {
 #include "../modules/pivot/wireguard.h"
 #include "../modules/pivot/socks5.h"
 #include "../modules/system/usbdrive.h"
+#include "tusb.h"   // tud_disconnect/tud_connect for 'exit' (TinyUSB mode)
 
 namespace {
     // ---------------------------------------------------------------
@@ -213,6 +214,41 @@ namespace {
     // wifi
     // ---------------------------------------------------------------
 
+    // Last station-disconnect reason reported by the WiFi driver, so a failed
+    // 'wifi connect' can say why (AP not found, handshake timeout, ...).
+    volatile uint8_t g_lastDiscReason = 0;
+
+    void onStaDisconnected(arduino_event_id_t, arduino_event_info_t info) {
+        uint8_t r = info.wifi_sta_disconnected.reason;
+        // "Leaving" reasons come from our own side (the core disconnects when
+        // it gives up); they would hide the real cause, so keep the last
+        // reason the AP or the radio produced.
+        if (r == WIFI_REASON_AUTH_LEAVE || r == WIFI_REASON_ASSOC_LEAVE || r == WIFI_REASON_STA_LEAVING) return;
+        g_lastDiscReason = r;
+    }
+
+    void hookWifiEvents() {
+        static bool done = false;
+        if (done) return;
+        done = true;
+        WiFi.onEvent(onStaDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    }
+
+    // Plain-language explanation for the disconnect reasons you actually hit.
+    const char *discHint(uint8_t reason) {
+        switch (reason) {
+            case WIFI_REASON_NO_AP_FOUND:           return "AP not seen: out of range, or wrong SSID";
+            case WIFI_REASON_AUTH_FAIL:
+            case WIFI_REASON_AUTH_EXPIRE:
+            case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+            case WIFI_REASON_HANDSHAKE_TIMEOUT:     return "wrong password, or the signal is too weak to finish the handshake";
+            case WIFI_REASON_ASSOC_EXPIRE:
+            case WIFI_REASON_ASSOC_FAIL:            return "the AP did not accept the association (weak signal or AP busy)";
+            case WIFI_REASON_BEACON_TIMEOUT:        return "lost the AP's beacons: signal too weak";
+            default:                                return "";
+        }
+    }
+
     void cmdWifi(std::vector<String> &a) {
         if (a.size() < 2) { printUsage("wifi"); return; }
         String sub = a[1]; sub.toLowerCase();
@@ -234,22 +270,68 @@ namespace {
             String ssid = a[2];
             String pass = a.size() > 3 ? a[3] : "";
             WiFi.mode(WIFI_STA);
+            hookWifiEvents();
+            g_lastDiscReason = 0;
+            // Radio tuning for weak signals. The Arduino defaults put the
+            // station in modem sleep (it dozes between beacons and misses
+            // frames at the edge of coverage) and let it use a 40 MHz
+            // channel, which is ~3 dB less sensitive than 20 MHz.
+            WiFi.setSleep(false);
+            WiFi.setTxPower(WIFI_POWER_19_5dBm);
+            esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
             // Apply stealth overrides (if set) before associating.
             if (netMac().length()) {
                 uint8_t m[6];
                 if (parseMac(netMac(), m)) {
                     esp_err_t e = esp_wifi_set_mac(WIFI_IF_STA, m);
-                    Serial.printf(e == ESP_OK ? "Using MAC %s\n" : "MAC override failed (%s), using real MAC\n",
-                                  e == ESP_OK ? netMac().c_str() : esp_err_to_name(e));
+                    uint8_t now[6] = {0};
+                    esp_wifi_get_mac(WIFI_IF_STA, now);   // read back: did the driver really take it?
+                    if (e == ESP_OK && memcmp(now, m, 6) == 0)
+                        Serial.printf("Using MAC %s\n", netMac().c_str());
+                    else
+                        Serial.printf("MAC override NOT applied (%s): still %s\n",
+                                      e == ESP_OK ? "driver ignored it" : esp_err_to_name(e),
+                                      WiFi.macAddress().c_str());
                 } else {
                     Serial.println("Configured MAC is invalid, using real MAC.");
                 }
             }
             if (netHostname().length()) WiFi.setHostname(netHostname().c_str());
-            WiFi.begin(ssid.c_str(), pass.length() ? pass.c_str() : nullptr);
+
+            // Find the AP ourselves before connecting. WiFi.begin() alone does one
+            // quick scan and gives up with NO_AP_FOUND when it misses the AP's
+            // reply, which at the edge of coverage is most of the time. Here:
+            // directed probes (they also wake hidden APs), a longer listen time per
+            // channel on the retries, then a connect straight to that channel and
+            // BSSID with no scan at all. If several APs share the SSID (mesh,
+            // repeaters) it picks the strongest. Done after the MAC override so the
+            // probes already carry the configured MAC.
+            static const uint32_t DWELL_MS[] = {200, 500, 500};
+            int bestRssi = -127, bestCh = 0;
+            uint8_t bestBssid[6] = {0};
+            bool found = false;
+            Serial.printf("Looking for '%s'", ssid.c_str());
+            for (int attempt = 0; attempt < 3 && !found; ++attempt) {
+                if (checkInterrupt()) { Serial.println("\n" + mErr() + " Aborted."); return; }
+                Serial.print(".");
+                int n = WiFi.scanNetworks(false, true, false, DWELL_MS[attempt], 0, ssid.c_str());
+                for (int i = 0; i < n; ++i) {
+                    if (WiFi.SSID(i) != ssid || WiFi.RSSI(i) <= bestRssi) continue;
+                    bestRssi = WiFi.RSSI(i);
+                    bestCh = WiFi.channel(i);
+                    WiFi.BSSID(i, bestBssid);
+                    found = true;
+                }
+                WiFi.scanDelete();
+            }
+            if (found) Serial.printf(" found: %d dBm, channel %d%s\n", bestRssi, bestCh, bestRssi <= -85 ? " (very weak)" : "");
+            else Serial.println(" not seen, connecting blind.");
+
+            if (found) WiFi.begin(ssid.c_str(), pass.length() ? pass.c_str() : nullptr, bestCh, bestBssid);
+            else WiFi.begin(ssid.c_str(), pass.length() ? pass.c_str() : nullptr);
             Serial.printf("Connecting to '%s' (Ctrl+C to abort)", ssid.c_str());
 
-            uint32_t deadline = millis() + 20000;
+            uint32_t deadline = millis() + 30000;
             bool interrupted = false;
             while (WiFi.status() != WL_CONNECTED && millis() < deadline) {
                 if (checkInterrupt()) { interrupted = true; break; }
@@ -265,8 +347,13 @@ namespace {
                 // Without this, esp_wifi keeps retrying the association on
                 // its own (NO_AP_FOUND/STA_LEAVING events) and floods the
                 // console long after this command has returned.
+                uint8_t why = g_lastDiscReason;
                 WiFi.disconnect(true);
                 Serial.println("\n" + mErr() + (interrupted ? " Aborted." : " Failed to connect (timeout)."));
+                if (!interrupted && why) {
+                    Serial.printf("    last reason: %s (%u)%s%s\n", WiFi.disconnectReasonName((wifi_err_reason_t)why), why,
+                                  discHint(why)[0] ? " - " : "", discHint(why));
+                }
             }
 
         } else if (sub == "disconnect") {
@@ -357,10 +444,11 @@ namespace {
         if (!requireWifi()) return;
 
         uint16_t startPort = 1, endPort = 1024, timeout = 400;
-        bool top = false;
+        bool top = false, syn = false;
         int mode = 2;
         for (size_t i = 2; i < a.size(); ++i) {
             if (a[i] == "-top") top = true;
+            else if (a[i] == "-s" || a[i] == "--syn") syn = true;
             else if (a[i] == "-p" && i + 1 < a.size()) {
                 String r = a[++i];
                 int dash = r.indexOf('-');
@@ -369,11 +457,14 @@ namespace {
             else if (a[i] == "-t" && i + 1 < a.size()) timeout = a[++i].toInt();
         }
 
+        if (syn) mode = PortScan::MODE_SYN;       // half-open scan; -m (banner/version) doesn't apply
+        else if (mode < 0 || mode > 2) { Serial.println("-m must be 0, 1 or 2 (use -s for a SYN scan)."); return; }
+
         if (!PortScan::start(base, startPort, endPort, (PortScan::Mode)mode, top, timeout, hostCount)) {
             Serial.println("Failed to start (already running or bad params).");
             return;
         }
-        Serial.println(hostCount > 1 ? "Scanning range... (Ctrl+C to stop)" : "Scanning... (Ctrl+C to stop)");
+        Serial.printf("%s%s... (Ctrl+C to stop)\n", syn ? "SYN scan" : "Scanning", hostCount > 1 ? " of the range" : "");
         pollUntilDone(
             []() { return PortScan::running(); },
             []() { uint32_t done, total; PortScan::progress(done, total); printProgress(done, total); },
@@ -389,6 +480,12 @@ namespace {
             if (!v.length()) v = r["banner"].as<String>();
             Serial.printf("%-16s %-8u %-16s %s\n", r["ip"].as<const char *>(), r["port"].as<unsigned>(),
                           r["service"].as<const char *>(), v.c_str());
+        }
+        if (syn) {
+            // SYN/ACK = open, RST = closed, no reply = filtered (dropped by a firewall or lost).
+            Serial.printf("\n%u open, %u closed (RST), %u filtered (no reply)\n",
+                          results.size(), d["closed"].as<unsigned>(), d["filtered"].as<unsigned>());
+            if (d["error"].as<String>().length()) Serial.println(mErr() + " " + d["error"].as<String>());
         }
     }
 
@@ -1581,6 +1678,42 @@ namespace {
 
     void cmdReboot(std::vector<String> &) { Serial.println("Rebooting..."); delay(200); ESP.restart(); }
 
+    // 'exit' ends the console session, not the device: nothing is stopped or
+    // powered down, so background tasks (arpspoof, responder, pcap, WireGuard,
+    // SOCKS5) keep running.
+    //
+    // A device can't close the program on the PC, but it can make the host see
+    // the cable being pulled: dropping the USB pull-up (tud_disconnect) makes
+    // the COM port vanish, so the terminal (miniterm, PuTTY, ...) ends and the
+    // user lands back in their shell. VBUS stays up, so the board keeps its
+    // power. The pull-up is restored after a moment so the port is back for the
+    // next session; opening a terminal then shows the banner as usual.
+    //
+    // g_loggedOut is the fallback if a host keeps its terminal open across the
+    // detach: the console stays silent and ignores input until Enter. In a
+    // script ('run' or /autorun.txt) 'exit' also stops the script.
+    bool g_loggedOut = false;
+    const uint32_t USB_DETACH_MS = 1500;
+
+    void cmdExit(std::vector<String> &) {
+        // While the SD is exported the host owns the FAT volume: detaching now
+        // would be an unplug without eject.
+        if (UsbDrive::isMounted()) {
+            Serial.println(mErr() + " The SD card is exported to the host as a USB drive; run 'unmount' first.");
+            return;
+        }
+        Serial.println("logout");
+        Serial.println("USB console detached. The device keeps running, including background tasks.");
+        Serial.println("Reconnect your terminal to start a new session.");
+        Serial.flush();
+        delay(300);                       // let the host read the text before the port vanishes
+        g_loggedOut = true;
+        if (tud_disconnect()) {
+            delay(USB_DETACH_MS);         // long enough for the host to drop the COM port
+            tud_connect();
+        }
+    }
+
     // ---------------------------------------------------------------
     // help + dispatch table
     // ---------------------------------------------------------------
@@ -1605,7 +1738,7 @@ namespace {
         {"help", "help [command]", "List all commands, or show one command's usage and options", "system", cmdHelp},
         {"wifi", "wifi scan | connect <ssid> [pass] | disconnect | status", "WiFi scanning and connection", "network", cmdWifi},
         {"download", "download <url> <path>", "HTTP(S) GET a file straight to the SD card", "network", cmdDownload},
-        {"portscan", "portscan <target>[/prefix] [-p a-b] [-top] [-m 0|1|2] [-t ms]", "TCP port scan (connect/banner/version)", "recon", cmdPortscan},
+        {"portscan", "portscan <target>[/prefix] [-p a-b] [-top] [-s] [-m 0|1|2] [-t ms]", "TCP port scan (connect/banner/version, or SYN with -s)", "recon", cmdPortscan},
         {"hostscan", "hostscan [ip[/prefix]]", "ICMP ping sweep (default: local /24)", "recon", cmdHostscan},
         {"arpscan", "arpscan [ip[/prefix]]", "ARP sweep (default: local /24; works even if ICMP is blocked)", "recon", cmdArpscan},
         {"nbtscan", "nbtscan [ip[/prefix]]", "NetBIOS node status sweep (default: local /24, no credentials)", "recon", cmdNbtscan},
@@ -1645,6 +1778,7 @@ namespace {
         {"mount", "mount", "Export the SD card to the host as a USB drive", "system", cmdMount},
         {"unmount", "unmount", "Stop exporting the SD card and reclaim it", "system", cmdUnmount},
         {"clear", "clear", "Clear the terminal screen", "system", cmdClear},
+        {"exit", "exit", "Close the terminal (USB detaches); the device and background tasks keep running", "system", cmdExit},
         {"reboot", "reboot", "Restart the device", "system", cmdReboot},
     };
     const size_t NUM_COMMANDS = sizeof(COMMANDS) / sizeof(COMMANDS[0]);
@@ -1846,6 +1980,7 @@ namespace {
     void showBanner() {
         resetLine();
         g_esc = Esc::NONE;
+        g_loggedOut = false;
         printBanner();
         printPrompt();
         g_bannerShown = true;
@@ -1906,9 +2041,10 @@ bool runScript(const String &path) {
         if (line.length() == 0 || line.startsWith("#")) continue;
         Serial.println("autorun> " + line);
         execute(line);
+        if (g_loggedOut) break;   // 'exit' in a script ends the script too
     }
     f.close();
-    if (ok) Serial.println("[autorun] done.");
+    if (ok && !g_loggedOut) Serial.println("[autorun] done.");
     return ok;
 }
 
@@ -1921,6 +2057,7 @@ void runAutorun() {
         delay(50);
     }
     runScript("/autorun.txt");
+    if (g_loggedOut) return;   // the script ended with 'exit': stay quiet
     Serial.println();
     printPrompt();
 }
@@ -1933,6 +2070,11 @@ void update() {
 
     while (Serial.available()) {
         char c = Serial.read();
+
+        if (g_loggedOut) {   // after 'exit': ignore everything until Enter
+            if (c == '\n') showBanner();
+            continue;
+        }
 
         if (g_esc == Esc::GOT_ESC) {
             g_esc = (c == '[') ? Esc::GOT_BRACKET : Esc::NONE;
@@ -1961,6 +2103,7 @@ void update() {
                 if (g_history.size() > MAX_HISTORY) g_history.erase(g_history.begin());
             }
             execute(line);
+            if (g_loggedOut) continue;   // 'exit': no prompt until Enter
             Serial.println();
             printPrompt();
             continue;

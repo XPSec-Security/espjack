@@ -34,10 +34,14 @@ namespace {
             "                       (192.168.1.0/24). Prefix /20 to /32.\n"
             "    -p <start-end>     Port range. Default 1-1024. One port: -p 80-80.\n"
             "    -top               Scan a built-in list of 54 common ports instead.\n"
-            "    -m <0|1|2>         0 = open/closed only, 1 = also grab the banner,\n"
-            "                       2 = banner + version detection (default).\n"
-            "    -t <ms>            Connect timeout per port, default 400. Raise it\n"
-            "                       on slow links, lower it for speed.\n"
+            "    -s, --syn          SYN scan (half-open): sends a SYN and reads the\n"
+            "                       reply, never completing the handshake. Lists open\n"
+            "                       ports and counts closed (RST) and filtered (no\n"
+            "                       reply). No banner or version; -m is ignored.\n"
+            "    -m <0|1|2>         Connect scan: 0 = open/closed only, 1 = also grab\n"
+            "                       the banner, 2 = banner + version (default).\n"
+            "    -t <ms>            Connect scan: timeout per port. SYN scan: how long\n"
+            "                       to wait for late replies. Default 400.\n"
         },
         {"hostscan",
             "OPTIONS\n"

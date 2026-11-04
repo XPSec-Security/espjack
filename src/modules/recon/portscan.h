@@ -2,13 +2,15 @@
 #include <Arduino.h>
 #include <IPAddress.h>
 
-// TCP port scanner with multiple modes (nmap-style, within what the
-// Arduino/lwIP stack allows — always a TCP connect scan; no SYN/raw scan).
+// TCP port scanner with multiple modes (nmap-style). Modes 0-2 are TCP
+// connect scans; mode 3 is a SYN (half-open) scan over an lwIP raw socket.
 namespace PortScan {
     enum Mode {
         MODE_CONNECT = 0,  // only checks open/closed
         MODE_BANNER  = 1,  // connect and grab banner
-        MODE_VERSION = 2   // connect, send probes and try to identify service/version
+        MODE_VERSION = 2,  // connect, send probes and try to identify service/version
+        MODE_SYN     = 3   // half-open: send a SYN, classify by the reply, never finish the
+                           // handshake. Open/closed/filtered only (no banner or version).
     };
 
     // Start a scan.
@@ -27,7 +29,8 @@ namespace PortScan {
     bool running();
     void progress(uint32_t &done, uint32_t &total);
 
-    // JSON: {running, target, mode, done, total,
+    // JSON: {running, target, mode, done, total, closed, filtered, error,
     //        results:[{ip,port,service,banner,version}]}
+    // closed/filtered are only counted by the SYN mode (RST / no reply).
     String status();
 }
