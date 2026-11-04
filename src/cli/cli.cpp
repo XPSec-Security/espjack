@@ -1602,7 +1602,7 @@ namespace {
     };
 
     CmdInfo COMMANDS[] = {
-        {"help", "help [command]", "List all commands, or show detailed help for one", "system", cmdHelp},
+        {"help", "help [command]", "List all commands, or show one command's usage and options", "system", cmdHelp},
         {"wifi", "wifi scan | connect <ssid> [pass] | disconnect | status", "WiFi scanning and connection", "network", cmdWifi},
         {"download", "download <url> <path>", "HTTP(S) GET a file straight to the SD card", "network", cmdDownload},
         {"portscan", "portscan <target>[/prefix] [-p a-b] [-top] [-m 0|1|2] [-t ms]", "TCP port scan (connect/banner/version)", "recon", cmdPortscan},
@@ -1685,7 +1685,7 @@ namespace {
         const CmdInfo *c = findCommand(name);
         if (!c) return;
         Serial.printf("Usage: %s\r\n", c->usage);
-        Serial.printf("Try '%s -h' for details and an example.\r\n", c->name);
+        Serial.printf("Try '%s -h' for the options.\r\n", c->name);
     }
 
     void cmdHelp(std::vector<String> &a) {
